@@ -1,16 +1,20 @@
-const path = require("path");
-const { constants } = require("fs");
-const { createWriteStream, createReadStream } = require("fs");
-const { mkdir, readdir, copyFile } = require("fs/promises");
-const { createInterface } = require("readline");
+const path = require('path');
+const { constants } = require('fs');
+const { createWriteStream, createReadStream } = require('fs');
+const { mkdir, readdir, copyFile } = require('fs/promises');
+const { createInterface } = require('readline');
+const { stdout } = require('process');
 
 //Folders
-const RESULT_FOLDER = "project-dist";
-const COMPONENTS_FOLDER = "components";
+const RESULT_FOLDER = 'project-dist';
+const COMPONENTS_FOLDER = 'components';
 const ASSETS_FOLDER = 'assets';
+const STYLES_FOLDER = 'styles';
 
-const TEMPLATE_HTML = "template.html";
-const RESULT_HTML = "index.html";
+const TEMPLATE_HTML = 'template.html';
+const RESULT_HTML = 'index.html';
+
+const CSS_BUNDLE_NAME ='style.css';
 
 const COMPONENT_PATTERN = /{{(.*?)}}/;
 
@@ -19,9 +23,9 @@ const distFolderPath = path.join(__dirname, RESULT_FOLDER);
 createFolder(distFolderPath).then(() => {
   const templateHtmlPath = path.join(__dirname, TEMPLATE_HTML);
   const bundleHtmlPath = path.join(distFolderPath, RESULT_HTML);
-  bundleHtml(templateHtmlPath, bundleHtmlPath);
-  copyAssets();
-});
+  return Promise.all([bundleHtml(templateHtmlPath, bundleHtmlPath), copyAssets(), bundleCSS()]);
+})
+.catch((error)=> stdout.write(error.message));
 
 function createFolder(folderPath) {
   return mkdir(folderPath, { recursive: true });
@@ -92,5 +96,29 @@ function copyFolderFile(fileName, from, to){
   const filePath = path.join(from, fileName);
   const destinationPath = path.join(to, fileName);
   return copyFile(filePath, destinationPath, constants.COPYFILE_FICLONE);
+}
+
+async function bundleCSS(){
+  const stylesFolderPath = path.join(__dirname, STYLES_FOLDER);
+  const bundlePath = path.join(distFolderPath, CSS_BUNDLE_NAME);
+  const bundleStream = createWriteStream(bundlePath);
+
+  const styles = await readdir(stylesFolderPath, { withFileTypes: true });
+  for(const { name } of styles){
+    const stylePath = path.join(stylesFolderPath, name);
+    await pipeContentToBundle(bundleStream, stylePath);
+  }
+
+  bundleStream.end();
+}
+
+function pipeContentToBundle(bundleStream, filePath) {
+  const readStream = createReadStream(filePath);
+  return new Promise((resolve, reject) => {
+    bundleStream.on('error', reject);
+    readStream.on('error', reject);
+    readStream.on('end', resolve);
+    readStream.pipe(bundleStream, { end: false });
+  });
 }
 
