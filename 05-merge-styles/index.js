@@ -1,6 +1,7 @@
 const { createWriteStream, createReadStream } = require("fs");
 const path = require("path");
 const { readdir } = require("fs/promises");
+const { stdout } = require("process");
 
 const START_FOLDER = "styles";
 const BUNDLE_NAME = "bundle.css";
@@ -11,20 +12,25 @@ const FILE_FILTER = (dirent) => dirent.isFile() && path.extname(dirent.name) ===
 
 createCSSBundle();
 
-function createCSSBundle() {
+async function createCSSBundle() {
   const startFolderPath = path.join(__dirname, START_FOLDER);
   const bundlePath = path.join(__dirname, DIST_FOLDER, BUNDLE_NAME);
-  const bundleStream = createWriteStream(bundlePath);
 
-  readdir(startFolderPath, { withFileTypes: true }).then((results) => {
-    const cssFiles = results.filter(FILE_FILTER).map((dirent) => dirent.name);
-    const promises = cssFiles.map((file)=> {
-      const filePath = path.join(startFolderPath, file);
-      return writeFileToBundle(bundleStream, filePath);
-    });
+  const files = await readdir(startFolderPath, { withFileTypes: true });
+  const cssFiles = files.filter(FILE_FILTER).map(({ name }) => path.join(startFolderPath, name));
 
-    Promise.all(promises).then(() => bundleStream.end());
-  });
+  for await(const info of bundleSSS(bundlePath, cssFiles)){
+    stdout.write(`${ info }\n`);
+  }
+}
+
+async function* bundleSSS(cssBundlePath, cssFiles){
+  const bundleStream = createWriteStream(cssBundlePath);
+  for(const cssFile of cssFiles){
+    await writeFileToBundle(bundleStream, cssFile);
+    bundleStream.write('\n');
+    yield cssFile;
+  }
 }
 
 function writeFileToBundle(bundleStream, filePath) {
