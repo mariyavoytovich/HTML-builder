@@ -1,12 +1,16 @@
 const { constants } = require("fs");
-const { readdir, mkdir, copyFile } = require("fs/promises");
+const { readdir, mkdir, copyFile, rm } = require("fs/promises");
 const { stdout } = require("process");
 const path = require("path");
 
 const COPY_FOLDER = "files";
 const FOLDER_SUFFIX = "-copy";
 
-copyFolder(COPY_FOLDER, __dirname, __dirname, `${COPY_FOLDER}${FOLDER_SUFFIX}`);
+const copyFolderName = `${COPY_FOLDER}${FOLDER_SUFFIX}`;
+
+rm(path.join(__dirname, copyFolderName), {recursive: true, force: true}).then(() => {
+  copyFolder(COPY_FOLDER, __dirname, __dirname, copyFolderName);
+});
 
 function copyFolder(folder, from, to, newName) {
   const folderPath = path.join(from, folder);
